@@ -39,24 +39,18 @@ A 3D editor and creative coding environment that runs entirely in the browser. B
 
 This version of the Browser Lab has AI features disabled by default. To enable AI features like chat assistance and image generation, you'll need to:
 
-1. Set up a Supabase project and enable the Edge Functions runtime.
-2. Create a `secrets` table in your Supabase database with the following structure:
-   - `id` (uuid, primary key)
-   - `key` (text)
-   - `value` (text)
-   - `created_at` (timestamptz)
+1.  Set up a Supabase project and enable the Edge Functions.
+2.  Add the following entries as Edge Function secrets in your Supabase project. You can find this under the "Secrets" tab within the "Edge Functions" section:
+    *   `OPENAI_API_KEY` with your OpenAI API key
+    *   `STABILITY_API_KEY` with your Stability AI API key
 
-3. Add the following entries to the `secrets` table:
-   - `OPENAI_API_KEY` with your OpenAI API key
-   - `STABILITY_API_KEY` with your Stability AI API key
+3.  Create the Edge Functions under the 'Functions' tab within the 'Edge Functions' section. This ensures users can access AI functionality securely, without exposing any API keys.
 
-4. Update the `.env` file with your Supabase URL and anon key:
-   ```
-   VITE_SUPABASE_URL=your_supabase_url_here
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-   ```
-
-5. Connect to Supabase by clicking the "Connect to Supabase" button in the top right of the editor.
+4.  Update the `.env` file with your Supabase URL and anon key:
+    ```
+    VITE_SUPABASE_URL=your_supabase_url_here
+    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+    ```
 
 ## Features Requiring Supabase
 
