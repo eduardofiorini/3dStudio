@@ -1,0 +1,1 @@
+// This file can be deleted as the code is now in SceneGrid.tsx
