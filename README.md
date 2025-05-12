@@ -2,6 +2,8 @@
 
 A 3D editor and creative coding environment that runs entirely in the browser. Built with React, Three.js, and TypeScript. 
 
+[Live Demo](https://thebrowserlab.com/)
+
 <img src="./public/media/demo.gif" alt="Demo" width="800" />
 
 ## Features
