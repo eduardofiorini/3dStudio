@@ -203,7 +203,7 @@ const isValidQuaternion = (quat: any): boolean => {
 };
 
   useFrame(() => {
-    if (rigidBodyRef.current && shouldApplyPhysics && !wasReset.current) {
+    if (rigidBodyRef.current && shouldApplyPhysics && !wasReset.current && !object.userData.gizmoTransformed) {
       // Only update object from physics body during simulation
       const position = rigidBodyRef.current.translation();
       const rotation = rigidBodyRef.current.rotation();
@@ -229,51 +229,26 @@ const isValidQuaternion = (quat: any): boolean => {
       // Update our tracking
       lastKnownPosition.current.copy(object.position);
       lastKnownRotation.current.copy(object.quaternion);
-    } else if (rigidBodyRef.current && !shouldApplyPhysics && !isResetting && !isTransforming) {
+    } else if (rigidBodyRef.current && !shouldApplyPhysics && !isResetting && !object.userData.gizmoTransformed) {
       // When simulation is not running, continuously sync physics body with object position
-      // BUT don't sync during transform operations to prevent interference with gizmo
+      // BUT skip sync if object was recently transformed by gizmo
       try {
-        const currentPos = rigidBodyRef.current.translation();
-        const currentRot = rigidBodyRef.current.rotation();
+        // Check if object position has changed since last frame
+        const hasPositionChanged = !object.position.equals(lastKnownPosition.current);
+        const hasRotationChanged = !object.quaternion.equals(lastKnownRotation.current);
         
-        // Check if object was moved by gizmo (priority over physics position)
-        const hasGizmoPosition = object.userData.lastGizmoPosition;
-        const hasGizmoRotation = object.userData.lastGizmoRotation;
-        
-        if (hasGizmoPosition || hasGizmoRotation) {
-          // Use gizmo position as authoritative source
+        if (hasPositionChanged || hasRotationChanged) {
+          // Object was moved externally (via transform inputs), sync physics body
           rigidBodyRef.current.setTranslation(object.position, true);
           rigidBodyRef.current.setRotation(object.quaternion, true);
           rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
           rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.resetTorques(true);
           
-          // Clear gizmo position flags
-          delete object.userData.lastGizmoPosition;
-          delete object.userData.lastGizmoRotation;
-        } else {
-          // Check if object position has changed significantly
-          const posChanged = Math.abs(currentPos.x - object.position.x) > 0.001 ||
-                            Math.abs(currentPos.y - object.position.y) > 0.001 ||
-                            Math.abs(currentPos.z - object.position.z) > 0.001;
-                            
-          const rotChanged = Math.abs(currentRot.x - object.quaternion.x) > 0.001 ||
-                            Math.abs(currentRot.y - object.quaternion.y) > 0.001 ||
-                            Math.abs(currentRot.z - object.quaternion.z) > 0.001 ||
-                            Math.abs(currentRot.w - object.quaternion.w) > 0.001;
-          
-          if (posChanged || rotChanged) {
-            rigidBodyRef.current.setTranslation(object.position, true);
-            rigidBodyRef.current.setRotation(object.quaternion, true);
-            
-            // Reset velocities to prevent drift
-            rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-            rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
-          }
+          // Update tracking
+          lastKnownPosition.current.copy(object.position);
+          lastKnownRotation.current.copy(object.quaternion);
         }
-          
-        // Update tracking
-        lastKnownPosition.current.copy(object.position);
-        lastKnownRotation.current.copy(object.quaternion);
       } catch (error) {
         console.warn('Failed to sync physics body in frame loop:', error);
       }
