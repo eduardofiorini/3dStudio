@@ -114,8 +114,8 @@ export function TransformControls3D() {
         rigidBody.wakeUp();
         
         // Store the new position as the "authoritative" position
-        object.userData.lastGizmoPosition = selectedObject.position.clone();
-        object.userData.lastGizmoRotation = selectedObject.quaternion.clone();
+        selectedObject.userData.lastGizmoPosition = selectedObject.position.clone();
+        selectedObject.userData.lastGizmoRotation = selectedObject.quaternion.clone();
         
       } catch (error) {
         console.error('Failed to sync physics during transform:', error);
