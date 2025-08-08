@@ -97,12 +97,12 @@ export function TransformControls3D() {
       scale: selectedObject.scale.clone()
     };
 
-    // CRITICAL: Immediately sync physics body with object transform
+    // CRITICAL: Immediately sync physics body with object transform AND force position update
     if (selectedObject.userData.physicsEnabled && selectedObject.userData.rigidBody) {
       try {
         const rigidBody = selectedObject.userData.rigidBody;
         
-        // Force update the physics body position immediately
+        // Force update the physics body position and ensure it sticks
         rigidBody.setTranslation(selectedObject.position, true);
         rigidBody.setRotation(selectedObject.quaternion, true);
         
@@ -110,10 +110,13 @@ export function TransformControls3D() {
         rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
         rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
         
-        // Wake up the body to ensure changes take effect
+        // Wake up the body and force it to stay at the new position
         rigidBody.wakeUp();
         
-        console.log('Physics body synced during transform');
+        // Store the new position as the "authoritative" position
+        object.userData.lastGizmoPosition = selectedObject.position.clone();
+        object.userData.lastGizmoRotation = selectedObject.quaternion.clone();
+        
       } catch (error) {
         console.error('Failed to sync physics during transform:', error);
       }
