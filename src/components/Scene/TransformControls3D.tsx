@@ -9,6 +9,8 @@ export function TransformControls3D() {
   const selectedObjects = useEditorStore((state) => state.selectedObjects);
   const transformMode = useEditorStore((state) => state.transformMode);
   const isPlaying = useTimelineStore((state) => state.isPlaying);
+  const isPhysicsEnabled = selectedObject?.userData.physicsEnabled;
+  const isKinematic = selectedObject?.userData.physicsType === 'kinematic';
   const isTransformLocked = selectedObject?.userData.transformLocked;
   const setIsTransforming = useEditorStore((state) => state.setIsTransforming);
   const updateTransform = useEditorStore((state) => state.updateTransform);
@@ -157,11 +159,20 @@ export function TransformControls3D() {
 
   if (!selectedObject) return null;
 
+  // Determine if transform controls should be enabled:
+  // - Never enabled if transform is locked
+  // - When simulation is running: only kinematic objects can be moved (position only)
+  // - When simulation is stopped: all objects can be transformed
+  const canTransform = !isTransformLocked && (
+    !isPlaying || // When not playing, all objects can be transformed
+    (isPhysicsEnabled && isKinematic && transformMode === 'translate') // During simulation, only kinematic position
+  );
+
   return (
     <TransformControls 
       object={selectedObject}
       mode={transformMode}
-      enabled={!isPlaying && !isTransformLocked}
+      enabled={canTransform}
       onDrag={handleTransform}
       onObjectChange={handleTransform}
       onMouseDown={handleMouseDown}

@@ -39,15 +39,20 @@ export function TransformGroup({
   const isPhysicsEnabled = selectedObject?.userData.physicsEnabled;
   const isKinematic = selectedObject?.userData.physicsType === 'kinematic';
   const isTransformLocked = selectedObject?.userData.transformLocked;
+  const isPlaying = useTimelineStore((state) => state.isPlaying);
   
   const [inputState, setInputState] = useState<InputState | null>(null);
   const [isScaleLocked, setIsScaleLocked] = useState(selectedObject?.userData.scaleLocked ?? true);
   
-  // Only disable transforms for physics-enabled objects that aren't kinematic,
-  // or disable rotation/scale for all physics-enabled objects
-  const isTransformDisabled = isTransformLocked || (isPhysicsEnabled && (
-    !isKinematic || // Non-kinematic objects can't be transformed
-    (title.toLowerCase() === 'rotation' || title.toLowerCase() === 'scale') // Kinematic objects can't rotate/scale
+  // Transform disable logic:
+  // - Always respect transform lock
+  // - When physics simulation is running:
+  //   - Only kinematic objects can be moved (position only)
+  //   - No objects can be rotated or scaled
+  // - When simulation is stopped: all objects can be transformed
+  const isTransformDisabled = isTransformLocked || (isPhysicsEnabled && isPlaying && (
+    !isKinematic || // Non-kinematic objects can't be transformed during simulation
+    (title.toLowerCase() === 'rotation' || title.toLowerCase() === 'scale') // No rotation/scale during simulation
   ));
 
   const getIcon = () => {

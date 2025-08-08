@@ -21,6 +21,7 @@ export function PhysicsObject({ object, type, onClick }: PhysicsObjectProps) {
   const shouldApplyPhysics = isPlaying && currentTime > 0;
   const wasReset = useRef(false);
   const selectedObject = useEditorStore((state) => state.selectedObject);
+  const transformMode = useEditorStore((state) => state.transformMode);
   const [isResetting, setIsResetting] = useState(false);
   const [lastResetTime, setLastResetTime] = useState(0);
 
@@ -50,11 +51,18 @@ export function PhysicsObject({ object, type, onClick }: PhysicsObjectProps) {
   // Determine the proper physics type
   const getPhysicsType = () => {
     if (!shouldApplyPhysics) {
-      // When not simulating, use kinematicPosition if selected
-      return isSelected ? 'kinematicPosition' : type;
+      // When not simulating, use kinematicPosition for easier manipulation
+      return 'kinematicPosition';
     }
-    // During simulation, use the specified type
-    return type === 'static' ? 'fixed' : type === 'kinematic' ? 'kinematicPosition' : 'dynamic';
+    // During simulation: 
+    // - Selected kinematic objects stay kinematic for transform controls
+    // - All others use their designated type
+    if (isSelected && type === 'kinematic' && transformMode === 'translate') {
+      return 'kinematicPosition';
+    }
+    return type === 'static' ? 'fixed' : 
+           type === 'kinematic' ? 'kinematicPosition' : 
+           'dynamic';
   };
   
   // Store initial scale when physics is enabled
