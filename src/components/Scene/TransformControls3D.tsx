@@ -96,10 +96,11 @@ export function TransformControls3D() {
       scale: selectedObject.scale.clone()
     };
 
-    if (selectedObject.userData.physicsBody) {
+    // Sync with physics body if it exists
+    const rigidBody = selectedObject.userData.rigidBody || selectedObject.userData.physicsBody;
+    if (rigidBody && selectedObject.userData.physicsEnabled) {
       try {
-        const physicsBody = selectedObject.userData.physicsBody;
-        physicsBody.setTranslation(
+        rigidBody.setTranslation(
           {
             x: selectedObject.position.x,
             y: selectedObject.position.y,
@@ -107,7 +108,7 @@ export function TransformControls3D() {
           },
           true
         );
-        physicsBody.setRotation(selectedObject.quaternion, true);
+        rigidBody.setRotation(selectedObject.quaternion, true);
       } catch (error) {
         console.error('Failed to sync physics during transform:', error);
       }

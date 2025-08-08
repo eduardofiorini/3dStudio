@@ -24,6 +24,8 @@ export function PhysicsObject({ object, type, onClick }: PhysicsObjectProps) {
   const transformMode = useEditorStore((state) => state.transformMode);
   const [isResetting, setIsResetting] = useState(false);
   const [lastResetTime, setLastResetTime] = useState(0);
+  const lastKnownPosition = useRef(object.position.clone());
+  const lastKnownRotation = useRef(object.quaternion.clone());
 
   // Validate physics configuration
   const validatePhysicsConfig = useCallback((config: any) => {
@@ -68,6 +70,28 @@ export function PhysicsObject({ object, type, onClick }: PhysicsObjectProps) {
       initialScaleRef.current = object.scale.clone();
     }
   }, [object.userData.physicsEnabled]);
+
+  // Sync physics body with object position when not simulating
+  useEffect(() => {
+    if (rigidBodyRef.current && !shouldApplyPhysics) {
+      // When simulation is not running, ensure physics body matches object position
+      const hasPositionChanged = !object.position.equals(lastKnownPosition.current);
+      const hasRotationChanged = !object.quaternion.equals(lastKnownRotation.current);
+      
+      if (hasPositionChanged || hasRotationChanged) {
+        try {
+          rigidBodyRef.current.setTranslation(object.position, true);
+          rigidBodyRef.current.setRotation(object.quaternion, true);
+          
+          // Update our tracking
+          lastKnownPosition.current.copy(object.position);
+          lastKnownRotation.current.copy(object.quaternion);
+        } catch (error) {
+          console.warn('Failed to sync physics body:', error);
+        }
+      }
+    }
+  });
 
   useEffect(() => {
     // Store physics body reference but don't clear it on unmount
@@ -166,6 +190,7 @@ const isValidQuaternion = (quat: any): boolean => {
 
   useFrame(() => {
     if (rigidBodyRef.current && shouldApplyPhysics && !wasReset.current) {
+      // Only update object from physics body during simulation
       const position = rigidBodyRef.current.translation();
       const rotation = rigidBodyRef.current.rotation();
       
@@ -186,6 +211,20 @@ const isValidQuaternion = (quat: any): boolean => {
 
       object.position.set(position.x, position.y, position.z);
       object.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+      
+      // Update our tracking
+      lastKnownPosition.current.copy(object.position);
+      lastKnownRotation.current.copy(object.quaternion);
+    } else if (rigidBodyRef.current && !shouldApplyPhysics) {
+      // When simulation is not running, sync physics body with object position
+      // but only if the object position has changed (to avoid unnecessary updates)
+      const currentPos = rigidBodyRef.current.translation();
+      if (Math.abs(currentPos.x - object.position.x) > 0.001 ||
+          Math.abs(currentPos.y - object.position.y) > 0.001 ||
+          Math.abs(currentPos.z - object.position.z) > 0.001) {
+        rigidBodyRef.current.setTranslation(object.position, true);
+        rigidBodyRef.current.setRotation(object.quaternion, true);
+      }
     }
   });
 
@@ -194,8 +233,8 @@ const isValidQuaternion = (quat: any): boolean => {
       ref={rigidBodyRef}
       enabled={shouldApplyPhysics && !wasReset.current}
       type={getPhysicsType()} // Use the dynamic type determination
-      position={[object.position.x, object.position.y, object.position.z]}
-      rotation={[object.rotation.x, object.rotation.y, object.rotation.z]}
+      position={object.position.toArray()}
+      rotation={object.rotation.toArray()}
       scale={[initialScaleRef.current.x, initialScaleRef.current.y, initialScaleRef.current.z]}
       mass={physicsConfig.mass}
       friction={physicsConfig.friction}
