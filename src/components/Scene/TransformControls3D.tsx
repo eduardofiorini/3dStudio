@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef } from 'react';
 import { TransformControls } from '@react-three/drei';
 import { useEditorStore } from '../../store/editorStore';
 import { useTimelineStore } from '../../store/timelineStore';
@@ -23,38 +23,6 @@ export function TransformControls3D() {
   });
   const initialOffsets = useRef(new Map<THREE.Object3D, THREE.Vector3>());
 
-  // Add effect to ensure physics body is properly synced when object is selected
-  useEffect(() => {
-    if (selectedObject && selectedObject.userData.physicsEnabled && selectedObject.userData.rigidBody) {
-      try {
-        const rigidBody = selectedObject.userData.rigidBody;
-        
-        // Ensure physics body position matches current object position
-        const currentPos = rigidBody.translation();
-        const objPos = selectedObject.position;
-        
-        // Check if they're out of sync
-        const positionDiff = Math.abs(currentPos.x - objPos.x) + 
-                           Math.abs(currentPos.y - objPos.y) + 
-                           Math.abs(currentPos.z - objPos.z);
-        
-        if (positionDiff > 0.001) {
-          // Sync physics body to object position
-          rigidBody.setTranslation(objPos, true);
-          rigidBody.setRotation(selectedObject.quaternion, true);
-          rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-          rigidBody.resetForces(true);
-          rigidBody.resetTorques(true);
-          rigidBody.wakeUp();
-          
-          console.log('Synced physics body to object position on selection');
-        }
-      } catch (error) {
-        console.warn('Failed to sync physics body on selection:', error);
-      }
-    }
-  }, [selectedObject]);
   const isValidVector = useCallback((vec: THREE.Vector3 | THREE.Euler): boolean => {
     return vec && 
            Number.isFinite(vec.x) && 
@@ -129,44 +97,41 @@ export function TransformControls3D() {
       scale: selectedObject.scale.clone()
     };
 
-    // Mark that this object was transformed by gizmo
-    if (selectedObject.userData.physicsEnabled) {
-      selectedObject.userData.gizmoTransformed = true;
-      selectedObject.userData.gizmoPosition = selectedObject.position.clone();
-      selectedObject.userData.gizmoRotation = selectedObject.quaternion.clone();
+    // CRITICAL: Immediately sync physics body with object transform AND force position update
+    if (selectedObject.userData.physicsEnabled && selectedObject.userData.rigidBody) {
+      try {
+        const rigidBody = selectedObject.userData.rigidBody;
+        
+        // Force update the physics body position and ensure it sticks
+        rigidBody.setTranslation(selectedObject.position, true);
+        rigidBody.setRotation(selectedObject.quaternion, true);
+        
+        // Reset physics velocities to prevent drift
+        rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        
+        // Wake up the body and force it to stay at the new position
+        rigidBody.wakeUp();
+        
+        // Store the new position as the "authoritative" position
+        selectedObject.userData.lastGizmoPosition = selectedObject.position.clone();
+        selectedObject.userData.lastGizmoRotation = selectedObject.quaternion.clone();
+        
+      } catch (error) {
+        console.error('Failed to sync physics during transform:', error);
+      }
     }
 
     updateTransform();
   }, [selectedObject, selectedObjects, updateTransform, isValidVector]);
 
   const handleMouseUp = useCallback(() => {
-    setIsTransforming(false);
+    // Delay turning off transform state to prevent deselection
+    setTimeout(() => {
+      setIsTransforming(false);
+    }, 0);
     
     if (selectedObject) {
-      // Sync physics body after gizmo transform completes
-      if (selectedObject.userData.physicsEnabled && selectedObject.userData.rigidBody) {
-        try {
-          const rigidBody = selectedObject.userData.rigidBody;
-          
-          // Force sync physics body to final gizmo position
-          rigidBody.setTranslation(selectedObject.position, true);
-          rigidBody.setRotation(selectedObject.quaternion, true);
-          rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-          rigidBody.resetForces(true);
-          rigidBody.resetTorques(true);
-          rigidBody.wakeUp();
-          
-          // Clear gizmo flags after sync
-          delete selectedObject.userData.gizmoTransformed;
-          delete selectedObject.userData.gizmoPosition;
-          delete selectedObject.userData.gizmoRotation;
-          
-        } catch (error) {
-          console.warn('Failed to sync physics after gizmo transform:', error);
-        }
-      }
-      
       // Add final state to history if transform was significant
       const finalState = {
         position: selectedObject.position.clone(),
@@ -203,8 +168,16 @@ export function TransformControls3D() {
 
   if (!selectedObject) return null;
 
-  // Simplified transform logic: allow transforms when not locked and (timeline at 0 OR simulation not playing)
-  const canTransform = !isTransformLocked && (currentTime === 0 || !isPlaying);
+  // Transform controls logic:
+  // - Always respect transform lock
+  // - Allow all transforms when timeline is at 0 (initial state)
+  // - Allow all transforms when simulation is not playing
+  // - During simulation: only kinematic objects can be positioned
+  const canTransform = !isTransformLocked && (
+    currentTime === 0 || // Always allow transforms at timeline start
+    !isPlaying || // Allow transforms when simulation is paused/stopped
+    (isPhysicsEnabled && isKinematic && transformMode === 'translate') // During simulation: only kinematic position
+  );
 
   return (
     <TransformControls 
@@ -216,7 +189,6 @@ export function TransformControls3D() {
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       space="world"
-      key={selectedObject.uuid} // Force component refresh on object change
     />
   );
 }
