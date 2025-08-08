@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { TransformControls } from '@react-three/drei';
 import { useEditorStore } from '../../store/editorStore';
 import { useTimelineStore } from '../../store/timelineStore';
