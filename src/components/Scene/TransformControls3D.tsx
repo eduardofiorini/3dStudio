@@ -96,19 +96,23 @@ export function TransformControls3D() {
       scale: selectedObject.scale.clone()
     };
 
-    // Sync with physics body if it exists
-    const rigidBody = selectedObject.userData.rigidBody || selectedObject.userData.physicsBody;
-    if (rigidBody && selectedObject.userData.physicsEnabled) {
+    // CRITICAL: Immediately sync physics body with object transform
+    if (selectedObject.userData.physicsEnabled && selectedObject.userData.rigidBody) {
       try {
-        rigidBody.setTranslation(
-          {
-            x: selectedObject.position.x,
-            y: selectedObject.position.y,
-            z: selectedObject.position.z
-          },
-          true
-        );
+        const rigidBody = selectedObject.userData.rigidBody;
+        
+        // Force update the physics body position immediately
+        rigidBody.setTranslation(selectedObject.position, true);
         rigidBody.setRotation(selectedObject.quaternion, true);
+        
+        // Reset physics velocities to prevent drift
+        rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        
+        // Wake up the body to ensure changes take effect
+        rigidBody.wakeUp();
+        
+        console.log('Physics body synced during transform');
       } catch (error) {
         console.error('Failed to sync physics during transform:', error);
       }

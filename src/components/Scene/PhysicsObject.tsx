@@ -94,11 +94,24 @@ export function PhysicsObject({ object, type, onClick }: PhysicsObjectProps) {
   });
 
   useEffect(() => {
-    // Store physics body reference but don't clear it on unmount
-    // This preserves the reference when objects are deselected/reselected
+    // CRITICAL: Store and maintain physics body reference
+    // This ensures the reference persists across selection changes
     if (rigidBodyRef.current && object) {
       object.userData.rigidBody = rigidBodyRef.current;
+      
+      // Ensure initial sync
+      try {
+        rigidBodyRef.current.setTranslation(object.position, true);
+        rigidBodyRef.current.setRotation(object.quaternion, true);
+        rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      } catch (error) {
+        console.warn('Failed to initialize physics body sync:', error);
+      }
     }
+    
+    // IMPORTANT: Don't clear the rigidBody reference on unmount
+    // This allows the reference to persist when objects are deselected/reselected
   }, [object]);
 
 useEffect(() => {
@@ -215,15 +228,36 @@ const isValidQuaternion = (quat: any): boolean => {
       // Update our tracking
       lastKnownPosition.current.copy(object.position);
       lastKnownRotation.current.copy(object.quaternion);
-    } else if (rigidBodyRef.current && !shouldApplyPhysics) {
-      // When simulation is not running, sync physics body with object position
-      // but only if the object position has changed (to avoid unnecessary updates)
-      const currentPos = rigidBodyRef.current.translation();
-      if (Math.abs(currentPos.x - object.position.x) > 0.001 ||
-          Math.abs(currentPos.y - object.position.y) > 0.001 ||
-          Math.abs(currentPos.z - object.position.z) > 0.001) {
-        rigidBodyRef.current.setTranslation(object.position, true);
-        rigidBodyRef.current.setRotation(object.quaternion, true);
+    } else if (rigidBodyRef.current && !shouldApplyPhysics && !isResetting) {
+      // When simulation is not running, continuously sync physics body with object position
+      try {
+        const currentPos = rigidBodyRef.current.translation();
+        const currentRot = rigidBodyRef.current.rotation();
+        
+        // Check if object position has changed significantly
+        const posChanged = Math.abs(currentPos.x - object.position.x) > 0.001 ||
+                          Math.abs(currentPos.y - object.position.y) > 0.001 ||
+                          Math.abs(currentPos.z - object.position.z) > 0.001;
+                          
+        const rotChanged = Math.abs(currentRot.x - object.quaternion.x) > 0.001 ||
+                          Math.abs(currentRot.y - object.quaternion.y) > 0.001 ||
+                          Math.abs(currentRot.z - object.quaternion.z) > 0.001 ||
+                          Math.abs(currentRot.w - object.quaternion.w) > 0.001;
+        
+        if (posChanged || rotChanged) {
+          rigidBodyRef.current.setTranslation(object.position, true);
+          rigidBodyRef.current.setRotation(object.quaternion, true);
+          
+          // Reset velocities to prevent drift
+          rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          
+          // Update tracking
+          lastKnownPosition.current.copy(object.position);
+          lastKnownRotation.current.copy(object.quaternion);
+        }
+      } catch (error) {
+        console.warn('Failed to sync physics body in frame loop:', error);
       }
     }
   });
