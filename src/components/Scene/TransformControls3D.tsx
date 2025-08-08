@@ -160,12 +160,13 @@ export function TransformControls3D() {
   if (!selectedObject) return null;
 
   // Determine if transform controls should be enabled:
-  // - Never enabled if transform is locked
-  // - When simulation is running: only kinematic objects can be moved (position only)
-  // - When simulation is stopped: all objects can be transformed
+  // Simplified logic: 
+  // - Respect transform lock
+  // - When simulation is running, only allow kinematic objects to be positioned
+  // - When simulation is stopped, allow all transforms
   const canTransform = !isTransformLocked && (
-    !isPlaying || // When not playing, all objects can be transformed
-    (isPhysicsEnabled && isKinematic && transformMode === 'translate') // During simulation, only kinematic position
+    !isPlaying || // Simulation stopped: all objects can be transformed
+    (isPhysicsEnabled && isKinematic && transformMode === 'translate') // Simulation running: only kinematic position
   );
 
   return (

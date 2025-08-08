@@ -50,19 +50,16 @@ export function PhysicsObject({ object, type, onClick }: PhysicsObjectProps) {
 
   // Determine the proper physics type
   const getPhysicsType = () => {
-    if (!shouldApplyPhysics) {
-      // When not simulating, use kinematicPosition for easier manipulation
-      return 'kinematicPosition';
+    // Simplified logic: always use the object's designated physics type
+    // Don't change body type based on selection state to prevent physics issues
+    switch (type) {
+      case 'static':
+        return 'fixed';
+      case 'kinematic':
+        return 'kinematicPosition';
+      default:
+        return 'dynamic';
     }
-    // During simulation: 
-    // - Selected kinematic objects stay kinematic for transform controls
-    // - All others use their designated type
-    if (isSelected && type === 'kinematic' && transformMode === 'translate') {
-      return 'kinematicPosition';
-    }
-    return type === 'static' ? 'fixed' : 
-           type === 'kinematic' ? 'kinematicPosition' : 
-           'dynamic';
   };
   
   // Store initial scale when physics is enabled
@@ -73,27 +70,12 @@ export function PhysicsObject({ object, type, onClick }: PhysicsObjectProps) {
   }, [object.userData.physicsEnabled]);
 
   useEffect(() => {
+    // Store physics body reference but don't clear it on unmount
+    // This preserves the reference when objects are deselected/reselected
     if (rigidBodyRef.current && object) {
-      // Store direct reference to rigid body
-      // Silently store the reference without logging
-      try {
-        object.userData.rigidBody = rigidBodyRef.current;
-      } catch (error) {
-        // Suppress error
-      }
-      
-      // Cleanup on unmount
-      return () => {
-        if (object) {
-          try {
-            delete object.userData.rigidBody;
-          } catch (error) {
-            // Suppress error
-          }
-        }
-      };
+      object.userData.rigidBody = rigidBodyRef.current;
     }
-  }, [rigidBodyRef.current, object]);
+  }, [object]);
 
 useEffect(() => {
     if (currentTime === 0 && rigidBodyRef.current) {
